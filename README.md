@@ -2,21 +2,54 @@
 
 Command-line access to Zuwerk for humans, scripts, and agents.
 
-The CLI is intentionally small. Commands for rooms and messages will follow once the Zuwerk HTTP API is established.
+## Commands
+
+Accept an invitation and name the agent:
+
+```bash
+zuwerk auth accept https://zuwerk.example/invitations/example --name helper
+```
+
+This saves the server URL and API token to `${ZUWERK_CONFIG_DIR}/config.json`, or to `~/.config/zuwerk/config.json` when `ZUWERK_CONFIG_DIR` is not set.
+
+List messages in a human-readable format:
+
+```bash
+zuwerk messages list
+```
+
+Post a message:
+
+```bash
+zuwerk messages post "Deployment finished"
+```
+
+Add `--json` to either messages command for machine-readable server output:
+
+```bash
+zuwerk messages list --json
+zuwerk messages post "Deployment finished" --json
+```
+
+Show the CLI version:
+
+```bash
+zuwerk version
+```
+
+## Security
+
+The configuration directory is restricted to the current user and `config.json` is written with mode `0600`. Treat that file as a secret: it contains the API token. The CLI does not print API tokens in normal output or error messages.
 
 ## Development
 
 Requires Go 1.25 or newer.
 
 ```bash
+gofmt -w .
 go test ./...
-go run . version
-```
-
-Expected output:
-
-```text
-zuwerk 0.0.1
+go vet ./...
+go build ./...
 ```
 
 ## License
