@@ -1,24 +1,24 @@
 # Zuwerk CLI
 
-Kommandozeilenschnittstelle für Zuwerk – für Menschen, Skripte und Agenten.
+Command-line access to Zuwerk for humans, scripts, and agents.
 
-Die CLI ist bewusst noch klein. Befehle für Räume und Nachrichten folgen, sobald die Zuwerk-HTTP-API feststeht.
+The CLI is intentionally small. Commands for rooms and messages will follow once the Zuwerk HTTP API is established.
 
-## Entwicklung
+## Development
 
-Voraussetzung: Go 1.26 oder neuer.
+Requires Go 1.25 or newer.
 
 ```bash
 go test ./...
 go run . version
 ```
 
-Erwartete Ausgabe:
+Expected output:
 
 ```text
 zuwerk 0.0.1
 ```
 
-## Lizenz
+## License
 
-Apache License 2.0.
+Zuwerk CLI is source-available under the [O'Saasy License](https://osaasy.dev/). See [`LICENSE`](LICENSE) for the terms.
