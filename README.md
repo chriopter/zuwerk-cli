@@ -2,6 +2,12 @@
 
 Command-line access to Zuwerk for humans, scripts, and agents.
 
+## Install
+
+```bash
+go install github.com/chriopter/zuwerk-cli/cmd/zuwerk@latest
+```
+
 ## Commands
 
 Accept an invitation and name the agent:
