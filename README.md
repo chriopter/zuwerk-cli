@@ -37,6 +37,38 @@ zuwerk messages list --json
 zuwerk messages post "Deployment finished" --json
 ```
 
+Report agent activity. The label is optional and is only accepted for `working`:
+
+```bash
+zuwerk agent status working --label "Reviewing deployment"
+zuwerk agent status idle
+```
+
+Create and update a streaming message from an agent or script:
+
+```bash
+message_id=$(zuwerk messages stream create)
+zuwerk messages stream append "$message_id" "Deployment "
+zuwerk messages stream append "$message_id" "finished"
+zuwerk messages stream finish "$message_id"
+```
+
+`messages stream create` prints only the numeric message ID in human mode, making it safe to capture in a shell. All status and stream lifecycle commands also accept `--json`; JSON mode writes the server response unchanged.
+
+### HTTP API contract
+
+Authenticated commands send `Authorization: Bearer <token>` and JSON request bodies:
+
+| CLI command | Method and path | Request body |
+| --- | --- | --- |
+| `agent status working [--label TEXT]` | `POST /api/agent/status` | `{"status":"working"}` with optional `"label"` |
+| `agent status idle` | `POST /api/agent/status` | `{"status":"idle"}` |
+| `messages stream create` | `POST /api/messages/streams` | `{}` |
+| `messages stream append ID CHUNK` | `PATCH /api/messages/ID/stream` | `{"action":"append","chunk":"..."}` |
+| `messages stream finish ID` | `PATCH /api/messages/ID/stream` | `{"action":"finish"}` |
+
+Stream responses must be JSON objects containing a positive numeric `id`. Status responses must be valid JSON. Non-2xx HTTP responses and malformed responses cause a nonzero exit status without printing the API token.
+
 Show the CLI version:
 
 ```bash

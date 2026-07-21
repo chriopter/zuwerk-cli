@@ -9,10 +9,17 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 )
 
 const version = "0.0.1"
+
+const (
+	agentStatusPath       = "/api/agent/status"
+	messageStreamsPath    = "/api/messages/streams"
+	messageStreamPathBase = "/api/messages/"
+)
 
 type options struct {
 	configDir string
@@ -82,8 +89,12 @@ func runWithOptions(args []string, stdout, stderr io.Writer, opts options) int {
 		err = listMessages(args[2:], stdout, opts)
 	case len(args) >= 2 && args[0] == "messages" && args[1] == "post":
 		err = postMessage(args[2:], stdout, opts)
+	case len(args) >= 3 && args[0] == "agent" && args[1] == "status":
+		err = setAgentStatus(args[2], args[3:], stdout, opts)
+	case len(args) >= 3 && args[0] == "messages" && args[1] == "stream":
+		err = streamMessage(args[2], args[3:], stdout, opts)
 	default:
-		fmt.Fprintln(stderr, "usage: zuwerk <auth accept|messages list|messages post|version>")
+		fmt.Fprintln(stderr, "usage: zuwerk <agent status|auth accept|messages list|messages post|messages stream|version>")
 		return 2
 	}
 	if err != nil {
@@ -91,6 +102,127 @@ func runWithOptions(args []string, stdout, stderr io.Writer, opts options) int {
 		return 1
 	}
 	return 0
+}
+
+func setAgentStatus(status string, args []string, stdout io.Writer, opts options) error {
+	jsonOutput := false
+	label := ""
+	for len(args) > 0 {
+		switch {
+		case args[0] == "--json" && !jsonOutput:
+			jsonOutput, args = true, args[1:]
+		case args[0] == "--label" && len(args) >= 2 && label == "" && strings.TrimSpace(args[1]) != "":
+			label, args = args[1], args[2:]
+		default:
+			return statusUsage(status)
+		}
+	}
+	if (status != "working" && status != "idle") || (status == "idle" && label != "") {
+		return statusUsage(status)
+	}
+	payload := map[string]string{"status": status}
+	if label != "" {
+		payload["label"] = label
+	}
+	data, _ := json.Marshal(payload)
+	response, err := authenticatedRequest(opts, http.MethodPost, agentStatusPath, data)
+	if err != nil {
+		return fmt.Errorf("agent status request failed: %w", err)
+	}
+	if !json.Valid(response) {
+		return errors.New("agent status response is malformed")
+	}
+	if jsonOutput {
+		writeJSON(stdout, response)
+	} else {
+		fmt.Fprintf(stdout, "Agent status set to %s.\n", status)
+	}
+	return nil
+}
+
+func statusUsage(status string) error {
+	if status == "working" {
+		return errors.New("usage: zuwerk agent status working [--label TEXT] [--json]")
+	}
+	return errors.New("usage: zuwerk agent status idle [--json]")
+}
+
+func streamMessage(action string, args []string, stdout io.Writer, opts options) error {
+	positional := map[string]int{"create": 0, "append": 2, "finish": 1}
+	want, ok := positional[action]
+	if !ok {
+		return streamUsage(action)
+	}
+	jsonOutput, err := parseJSONFlag("messages stream "+action, args, want)
+	if err != nil {
+		return streamUsage(action)
+	}
+	values := make([]string, 0, want)
+	for _, arg := range args {
+		if arg != "--json" {
+			values = append(values, arg)
+		}
+	}
+	var path string
+	var payload []byte
+	if action == "create" {
+		path, payload = messageStreamsPath, []byte(`{}`)
+	} else {
+		id := values[0]
+		parsedID, parseErr := strconv.ParseUint(id, 10, 64)
+		if parseErr != nil || parsedID == 0 {
+			return streamUsage(action)
+		}
+		path = messageStreamPathBase + id + "/stream"
+		request := map[string]string{"action": action}
+		if action == "append" {
+			request["chunk"] = values[1]
+		}
+		payload, _ = json.Marshal(request)
+	}
+	method := http.MethodPatch
+	if action == "create" {
+		method = http.MethodPost
+	}
+	response, err := authenticatedRequest(opts, method, path, payload)
+	if err != nil {
+		return fmt.Errorf("message stream %s request failed: %w", action, err)
+	}
+	var result struct {
+		ID uint64 `json:"id"`
+	}
+	if err := json.Unmarshal(response, &result); err != nil || result.ID == 0 {
+		return fmt.Errorf("message stream %s response is malformed or incomplete", action)
+	}
+	if jsonOutput {
+		writeJSON(stdout, response)
+	} else if action == "create" {
+		fmt.Fprintln(stdout, result.ID)
+	} else if action == "append" {
+		fmt.Fprintf(stdout, "Chunk appended to message %d.\n", result.ID)
+	} else {
+		fmt.Fprintf(stdout, "Message %d finished.\n", result.ID)
+	}
+	return nil
+}
+
+func streamUsage(action string) error {
+	switch action {
+	case "create":
+		return errors.New("usage: zuwerk messages stream create [--json]")
+	case "append":
+		return errors.New("usage: zuwerk messages stream append <message-id> <chunk> [--json]")
+	default:
+		return errors.New("usage: zuwerk messages stream finish <message-id> [--json]")
+	}
+}
+
+func authenticatedRequest(opts options, method, path string, payload []byte) ([]byte, error) {
+	cfg, err := loadConfig(opts.configDir)
+	if err != nil {
+		return nil, err
+	}
+	return doRequest(opts.client, method, cfg.ServerURL+path, cfg.APIToken, payload)
 }
 
 func acceptInvitation(args []string, stdout io.Writer, opts options) error {
