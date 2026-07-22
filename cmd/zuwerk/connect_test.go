@@ -49,6 +49,56 @@ func TestConnectorRejectsWrongIdentifierAndNonObjectInboundACP(t *testing.T) {
 	}
 }
 
+func TestDecodeEnvelopeAcceptsSemanticConnectorIdentifier(t *testing.T) {
+	for _, identifier := range []string{
+		`{"channel":"AgentConnectorChannel"}`,
+		`{ "channel" : "AgentConnectorChannel" }`,
+	} {
+		frame, err := json.Marshal(map[string]any{"type": "confirm_subscription", "identifier": identifier})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := decodeEnvelope(frame); err != nil {
+			t.Fatalf("identifier %q rejected: %v", identifier, err)
+		}
+	}
+}
+
+func TestDecodeEnvelopeRejectsInvalidConnectorIdentifier(t *testing.T) {
+	for _, identifier := range []string{
+		`{"channel":"OtherChannel"}`,
+		`{"channel":"AgentConnectorChannel","room":"forbidden"}`,
+		`{"channel":"AgentConnectorChannel","channel":"AgentConnectorChannel"}`,
+		`{"channel":1}`,
+		`not-json`,
+	} {
+		frame, err := json.Marshal(map[string]any{"type": "confirm_subscription", "identifier": identifier})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := decodeEnvelope(frame); err == nil {
+			t.Fatalf("identifier %q accepted", identifier)
+		}
+	}
+}
+
+func TestConnectorIgnoresActionCablePingMessage(t *testing.T) {
+	server := confirmedCableServer(t, func(ctx context.Context, conn *websocket.Conn) {
+		_ = conn.Write(ctx, websocket.MessageText, []byte(`{"type":"ping","message":1234567890}`))
+	})
+	defer server.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+	child := newFakeChild()
+	err := runConnector(ctx, config{ServerURL: server.URL, APIToken: "token"}, []string{"fake"}, connectorOptions{
+		startChild: func(context.Context, []string) (connectorChild, error) { return child, nil },
+		backoff:    func(int) time.Duration { return time.Millisecond },
+	})
+	if err != nil {
+		t.Fatalf("Action Cable ping must be ignored: %v", err)
+	}
+}
+
 func TestReconnectOnlyBeforeACPTraffic(t *testing.T) {
 	for _, traffic := range []bool{false, true} {
 		t.Run(fmt.Sprint(traffic), func(t *testing.T) {

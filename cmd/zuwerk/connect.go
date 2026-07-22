@@ -129,6 +129,27 @@ func validJSONObject(data []byte) bool {
 	return decoder.Decode(&struct{}{}) == io.EOF
 }
 
+func validConnectorIdentifier(identifier string) bool {
+	decoder := json.NewDecoder(strings.NewReader(identifier))
+	token, err := decoder.Token()
+	if err != nil || token != json.Delim('{') || !decoder.More() {
+		return false
+	}
+	key, err := decoder.Token()
+	if err != nil || key != "channel" {
+		return false
+	}
+	var channel string
+	if err := decoder.Decode(&channel); err != nil || channel != "AgentConnectorChannel" || decoder.More() {
+		return false
+	}
+	token, err = decoder.Token()
+	if err != nil || token != json.Delim('}') {
+		return false
+	}
+	return decoder.Decode(&struct{}{}) == io.EOF
+}
+
 func readACPLine(r *bufio.Reader) (string, error) {
 	line := make([]byte, 0, 4096)
 	for {
@@ -336,7 +357,7 @@ func connectOnce(ctx context.Context, wsURL, token string, stdin io.Writer, line
 			out.err = protocolErr
 			return out
 		}
-		if (env.Type == "confirm_subscription" || env.Type == "reject_subscription") && env.Identifier != connectorIdentifier {
+		if (env.Type == "confirm_subscription" || env.Type == "reject_subscription") && !validConnectorIdentifier(env.Identifier) {
 			out.err = fmt.Errorf("%w: unexpected Action Cable identifier", errPermanent)
 			return out
 		}
@@ -365,10 +386,10 @@ func connectOnce(ctx context.Context, wsURL, token string, stdin io.Writer, line
 				readErr <- err
 				return
 			}
-			if len(env.Message) == 0 {
+			if env.Type != "" || len(env.Message) == 0 {
 				continue
 			}
-			if env.Identifier != connectorIdentifier {
+			if !validConnectorIdentifier(env.Identifier) {
 				readErr <- fmt.Errorf("%w: unexpected Action Cable identifier", errPermanent)
 				return
 			}
@@ -459,7 +480,7 @@ func decodeEnvelope(data []byte) (cableEnvelope, error) {
 	if !validJSONObject(data) || json.Unmarshal(data, &env) != nil {
 		return env, fmt.Errorf("%w: malformed Action Cable frame", errPermanent)
 	}
-	if env.Identifier != "" && env.Identifier != connectorIdentifier {
+	if env.Identifier != "" && !validConnectorIdentifier(env.Identifier) {
 		return env, fmt.Errorf("%w: unexpected Action Cable identifier", errPermanent)
 	}
 	return env, nil
