@@ -39,6 +39,8 @@ zuwerk todos comments create --project <id> --todo <id> --body <text|-> [--event
 
 zuwerk agent status working [--label <text>]
 zuwerk agent status idle
+
+zuwerk connect -- <adapter> [args...]
 ```
 
 A value of `-` for a message body or todo description reads that value from standard input:
@@ -50,6 +52,12 @@ printf '%s' 'Updated details' | zuwerk todos update 9 --project 17 --description
 ```
 
 Project and resource IDs must be positive decimal integers. Project-scoped commands always require `--project`; there is no implicit default project. Unknown flags, duplicate flags, legacy commands, and `--json` are rejected.
+
+## ACP connector
+
+`zuwerk connect -- <adapter> [args...]` starts one local ACP adapter and keeps it connected to the configured Zuwerk server. The connector uses Action Cable at `/cable`, authenticates with the configured Bearer token, and subscribes to `AgentConnectorChannel`. It forwards one bounded JSON object per NDJSON line in both directions, emits heartbeats, reconnects transient socket failures with bounded exponential backoff, and shuts down with the adapter on SIGINT or SIGTERM. The API token is never placed in the WebSocket URL or diagnostic output.
+
+Unlike one-shot commands, `connect` is a long-running transport and does not write a JSON result to standard output. The adapter owns standard error; its standard output must contain ACP NDJSON only.
 
 ## HTTP API contract
 

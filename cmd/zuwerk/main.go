@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -9,9 +10,11 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -26,6 +29,8 @@ type options struct {
 	configDir string
 	stdin     io.Reader
 	client    *http.Client
+	ctx       context.Context
+	connector connectorOptions
 }
 type config struct {
 	ServerURL string `json:"server_url"`
@@ -51,7 +56,9 @@ func main() {
 		}
 		dir = filepath.Join(home, ".config", "zuwerk")
 	}
-	os.Exit(runWithOptions(os.Args[1:], os.Stdout, os.Stderr, options{configDir: dir, stdin: os.Stdin, client: defaultHTTPClient}))
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	os.Exit(runWithOptions(os.Args[1:], os.Stdout, os.Stderr, options{configDir: dir, stdin: os.Stdin, client: defaultHTTPClient, ctx: ctx}))
 }
 
 func run(args []string, stdout, stderr io.Writer) int {
@@ -73,6 +80,24 @@ func runWithOptions(args []string, stdout, stderr io.Writer, opts options) int {
 	}
 	if opts.stdin == nil {
 		opts.stdin = strings.NewReader("")
+	}
+	if opts.ctx == nil {
+		opts.ctx = context.Background()
+	}
+	if len(args) > 0 && args[0] == "connect" {
+		adapter, err := parseConnectArgs(args[1:])
+		if err == nil {
+			var cfg config
+			cfg, err = loadConfig(opts.configDir)
+			if err == nil {
+				err = runConnector(opts.ctx, cfg, adapter, opts.connector)
+			}
+		}
+		if err != nil {
+			fmt.Fprintf(stderr, "error: %v\n", err)
+			return 1
+		}
+		return 0
 	}
 	var data []byte
 	var err error
@@ -104,7 +129,7 @@ func runWithOptions(args []string, stdout, stderr io.Writer, opts options) int {
 	case len(args) >= 3 && args[0] == "agent" && args[1] == "status":
 		data, err = setAgentStatus(args[2:], opts)
 	default:
-		fmt.Fprintln(stderr, "usage: zuwerk <agent status|auth accept|messages|projects|todos|version>")
+		fmt.Fprintln(stderr, "usage: zuwerk <agent status|auth accept|connect|messages|projects|todos|version>")
 		return 2
 	}
 	if err != nil {
