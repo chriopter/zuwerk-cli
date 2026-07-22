@@ -340,7 +340,7 @@ func TestConnectBridgesInOrderWithBearerSubscriptionAndHeartbeat(t *testing.T) {
 			}
 		}
 		if len(lines) >= 2 && heartbeat {
-			if lines[0] != `{"jsonrpc":"2.0","id":2}` || lines[1] != `{"jsonrpc":"2.0","id":3}` {
+			if lines[0] != `{"jsonrpc":"2.0","id":2}`+"\n" || lines[1] != `{"jsonrpc":"2.0","id":3}`+"\n" {
 				t.Fatalf("lines=%v", lines)
 			}
 			cancel()
@@ -360,6 +360,10 @@ func TestReadACPLineRejectsMalformedAndOversized(t *testing.T) {
 	}
 	if got, err := readACPLine(bufio.NewReader(strings.NewReader(`{"ok":true}` + "\n"))); err != nil || got != `{"ok":true}` {
 		t.Fatalf("got=%q err=%v", got, err)
+	}
+	undelimitedAtLimit := `{"x":"` + strings.Repeat("a", maxACPLineBytes-len(`{"x":""}`)) + `"}`
+	if _, err := readACPLine(bufio.NewReader(strings.NewReader(undelimitedAtLimit))); err == nil {
+		t.Fatal("accepted max-size adapter JSON that needs an additional delimiter")
 	}
 }
 

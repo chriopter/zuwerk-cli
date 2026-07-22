@@ -166,6 +166,9 @@ func readACPLine(r *bufio.Reader) (string, error) {
 		}
 		break
 	}
+	if !bytes.HasSuffix(line, []byte{'\n'}) && len(line)+1 > maxACPLineBytes {
+		return "", errors.New("ACP line is too large")
+	}
 	line = bytes.TrimSuffix(line, []byte{'\n'})
 	line = bytes.TrimSuffix(line, []byte{'\r'})
 	if len(line) == 0 || !validJSONObject(line) {
@@ -505,6 +508,9 @@ func decodeEnvelope(data []byte) (cableEnvelope, error) {
 }
 
 func perform(ctx context.Context, conn *websocket.Conn, payload connectorPayload) error {
+	if payload.Type == "acp" && !strings.HasSuffix(payload.Line, "\n") {
+		payload.Line += "\n"
+	}
 	data, err := json.Marshal(payload)
 	if err != nil {
 		return err
