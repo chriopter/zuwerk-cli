@@ -75,6 +75,8 @@ func TestCanonicalResourceCommands(t *testing.T) {
 		{"todos show", []string{"todos", "show", "4", "--project", "7"}, "GET", "/api/projects/7/todos/4", "", `{"id":4,"title":"Test"}`},
 		{"todos create", []string{"todos", "create", "--project", "7", "--title", "Test", "--description", "Details"}, "POST", "/api/projects/7/todos", `{"description":"Details","title":"Test"}`, `{"id":4,"title":"Test"}`},
 		{"todos update", []string{"todos", "update", "4", "--project", "7", "--title", "Done", "--description", "All done", "--status", "completed"}, "PATCH", "/api/projects/7/todos/4", `{"description":"All done","status":"completed","title":"Done"}`, `{"id":4,"status":"completed"}`},
+		{"todo comments list", []string{"todos", "comments", "list", "--project", "7", "--todo", "4"}, "GET", "/api/projects/7/todos/4/comments", "", `[{"id":8,"body":"Context"}]`},
+		{"todo comments create", []string{"todos", "comments", "create", "--project", "7", "--todo", "4", "--event", "event-123", "--body", "Finished"}, "POST", "/api/projects/7/todos/4/comments", `{"body":"Finished","event_id":"event-123"}`, `{"id":8,"body":"Finished"}`},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

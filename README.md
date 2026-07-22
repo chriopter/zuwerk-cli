@@ -34,6 +34,8 @@ zuwerk todos list --project <id>
 zuwerk todos show <id> --project <id>
 zuwerk todos create --project <id> --title <title> [--description <text|->]
 zuwerk todos update <id> --project <id> [--title <title>] [--description <text|->] [--status open|completed]
+zuwerk todos comments list --project <id> --todo <id>
+zuwerk todos comments create --project <id> --todo <id> --body <text|-> [--event <event-id>]
 
 zuwerk agent status working [--label <text>]
 zuwerk agent status idle
@@ -63,6 +65,8 @@ Authenticated requests send an `Authorization: Bearer …` header. Commands with
 | `todos show ID --project PROJECT` | `GET /api/projects/PROJECT/todos/ID` | none |
 | `todos create --project ID --title TITLE [--description TEXT]` | `POST /api/projects/ID/todos` | `{"title":"..."}` with optional `"description"` |
 | `todos update ID --project PROJECT ...` | `PATCH /api/projects/PROJECT/todos/ID` | supplied `title`, `description`, and/or `status` fields |
+| `todos comments list --project PROJECT --todo ID` | `GET /api/projects/PROJECT/todos/ID/comments` | none |
+| `todos comments create --project PROJECT --todo ID --body TEXT` | `POST /api/projects/PROJECT/todos/ID/comments` | `{"body":"..."}` with optional `"event_id"` |
 | `agent status working [--label TEXT]` | `POST /api/agent/status` | `{"status":"working"}` with optional `"label"` |
 | `agent status idle` | `POST /api/agent/status` | `{"status":"idle"}` |
 

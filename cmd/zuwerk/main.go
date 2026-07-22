@@ -97,6 +97,10 @@ func runWithOptions(args []string, stdout, stderr io.Writer, opts options) int {
 		data, err = createTodo(args[2:], opts)
 	case len(args) >= 2 && args[0] == "todos" && args[1] == "update":
 		data, err = updateTodo(args[2:], opts)
+	case len(args) >= 3 && args[0] == "todos" && args[1] == "comments" && args[2] == "list":
+		data, err = listTodoComments(args[3:], opts)
+	case len(args) >= 3 && args[0] == "todos" && args[1] == "comments" && args[2] == "create":
+		data, err = createTodoComment(args[3:], opts)
 	case len(args) >= 3 && args[0] == "agent" && args[1] == "status":
 		data, err = setAgentStatus(args[2:], opts)
 	default:
@@ -210,6 +214,32 @@ func updateTodo(args []string, opts options) ([]byte, error) {
 	}
 	payload, _ := json.Marshal(p)
 	return authenticatedRequest(opts, http.MethodPatch, "/api/projects/"+projectID+"/todos/"+args[0], payload)
+}
+func listTodoComments(args []string, opts options) ([]byte, error) {
+	f, err := parseFlags(args, map[string]bool{"--project": true, "--todo": true})
+	if err != nil || !positiveID(f["--project"]) || !positiveID(f["--todo"]) {
+		return nil, usageError("todos comments list --project <id> --todo <id>")
+	}
+	return authenticatedRequest(opts, http.MethodGet, "/api/projects/"+f["--project"]+"/todos/"+f["--todo"]+"/comments", nil)
+}
+func createTodoComment(args []string, opts options) ([]byte, error) {
+	f, err := parseFlags(args, map[string]bool{"--project": true, "--todo": true, "--body": true, "--event": true})
+	if err != nil || !positiveID(f["--project"]) || !positiveID(f["--todo"]) || f["--body"] == "" {
+		return nil, usageError("todos comments create --project <id> --todo <id> --body <text|-> [--event <id>]")
+	}
+	body, err := textValue(f["--body"], opts.stdin)
+	if err != nil {
+		return nil, err
+	}
+	p := map[string]string{"body": body}
+	if eventID, ok := f["--event"]; ok {
+		if strings.TrimSpace(eventID) == "" || len(eventID) > 200 {
+			return nil, usageError("todos comments create --project <id> --todo <id> --body <text|-> [--event <id>]")
+		}
+		p["event_id"] = eventID
+	}
+	payload, _ := json.Marshal(p)
+	return authenticatedRequest(opts, http.MethodPost, "/api/projects/"+f["--project"]+"/todos/"+f["--todo"]+"/comments", payload)
 }
 func setAgentStatus(args []string, opts options) ([]byte, error) {
 	if len(args) < 1 {
