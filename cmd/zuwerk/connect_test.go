@@ -175,6 +175,34 @@ func TestExecChildSupportsSignals(t *testing.T) {
 	_ = child.Kill()
 }
 
+func TestWriteAdapterLinePreservesSingleNDJSONDelimiter(t *testing.T) {
+	for _, line := range []string{"{}", "{}\n"} {
+		var output strings.Builder
+		if err := writeAdapterLine(context.Background(), &output, line); err != nil {
+			t.Fatal(err)
+		}
+		if got, want := output.String(), "{}\n"; got != want {
+			t.Fatalf("input=%q output=%q want %q", line, got, want)
+		}
+	}
+}
+
+func TestInboundACPLineLimitIncludesExactlyOneDelimiter(t *testing.T) {
+	jsonAtLimit := `{"x":"` + strings.Repeat("a", maxACPLineBytes-len(`{"x":""}`)-1) + `"}`
+	for _, line := range []string{jsonAtLimit, jsonAtLimit + "\n"} {
+		if !validInboundACPLine(line) {
+			t.Fatalf("rejected valid %d-byte adapter line", len(line))
+		}
+	}
+	if validInboundACPLine(jsonAtLimit + "\n\n") {
+		t.Fatal("accepted multiple delimiters")
+	}
+	overLimit := `{"x":"` + strings.Repeat("a", maxACPLineBytes-len(`{"x":""}`)) + `"}`
+	if validInboundACPLine(overLimit) || validInboundACPLine(overLimit+"\n") {
+		t.Fatal("accepted oversized adapter line")
+	}
+}
+
 func TestBlockedAdapterStdinIsUnblockedOnCancellation(t *testing.T) {
 	r, w := io.Pipe()
 	defer r.Close()

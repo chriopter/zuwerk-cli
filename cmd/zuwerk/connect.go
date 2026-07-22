@@ -394,7 +394,7 @@ func connectOnce(ctx context.Context, wsURL, token string, stdin io.Writer, line
 				return
 			}
 			var payload connectorPayload
-			if json.Unmarshal(env.Message, &payload) != nil || payload.Type != "acp" || len(payload.Line)+1 > maxACPLineBytes || !validJSONObject([]byte(payload.Line)) {
+			if json.Unmarshal(env.Message, &payload) != nil || payload.Type != "acp" || !validInboundACPLine(payload.Line) {
 				readErr <- fmt.Errorf("%w: malformed ACP frame", errPermanent)
 				return
 			}
@@ -442,10 +442,28 @@ func connectOnce(ctx context.Context, wsURL, token string, stdin io.Writer, line
 	}
 }
 
+func validInboundACPLine(line string) bool {
+	lineBytes := len(line)
+	if strings.HasSuffix(line, "\n") {
+		if strings.Count(line, "\n") != 1 {
+			return false
+		}
+	} else {
+		if strings.Contains(line, "\n") {
+			return false
+		}
+		lineBytes++
+	}
+	return lineBytes <= maxACPLineBytes && validJSONObject([]byte(line))
+}
+
 func writeAdapterLine(ctx context.Context, stdin io.Writer, line string) error {
+	if !strings.HasSuffix(line, "\n") {
+		line += "\n"
+	}
 	done := make(chan error, 1)
 	go func() {
-		_, err := io.WriteString(stdin, line+"\n")
+		_, err := io.WriteString(stdin, line)
 		done <- err
 	}()
 	select {
