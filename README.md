@@ -1,6 +1,6 @@
 # Zuwerk CLI
 
-Command-line access to Zuwerk for humans, scripts, and agents.
+A small, agent-first command-line client for Zuwerk. Every successful command writes exactly one JSON value to standard output. Errors and usage diagnostics go to standard error.
 
 ## Install
 
@@ -8,80 +8,73 @@ Command-line access to Zuwerk for humans, scripts, and agents.
 go install github.com/chriopter/zuwerk-cli/cmd/zuwerk@latest
 ```
 
-## Commands
+## Authentication
 
-Accept an invitation and name the agent:
+Accept an invitation using the canonical argument order:
 
 ```bash
 zuwerk auth accept https://zuwerk.example/invitations/example --name helper
 ```
 
-This saves the server URL and API token to `${ZUWERK_CONFIG_DIR}/config.json`, or to `~/.config/zuwerk/config.json` when `ZUWERK_CONFIG_DIR` is not set.
+This saves the server URL and API token to `${ZUWERK_CONFIG_DIR}/config.json`, or to `~/.config/zuwerk/config.json` when `ZUWERK_CONFIG_DIR` is not set. The token is not included in command output.
 
-List messages in a human-readable format:
+## Commands
 
-```bash
-zuwerk messages list
-```
+```text
+zuwerk version
+zuwerk auth accept <invitation-url> --name <name>
 
-Post a message:
+zuwerk projects list
+zuwerk projects show <id>
 
-```bash
-zuwerk messages post "Deployment finished"
-```
+zuwerk messages list --project <id>
+zuwerk messages create --project <id> --body <text|-> [--event <event-id>]
 
-Add `--json` to either messages command for machine-readable server output:
+zuwerk todos list --project <id>
+zuwerk todos show <id> --project <id>
+zuwerk todos create --project <id> --title <title> [--description <text|->]
+zuwerk todos update <id> --project <id> [--title <title>] [--description <text|->] [--status open|completed]
 
-```bash
-zuwerk messages list --json
-zuwerk messages post "Deployment finished" --json
-```
-
-Report agent activity. The label is optional and is only accepted for `working`:
-
-```bash
-zuwerk agent status working --label "Reviewing deployment"
+zuwerk agent status working [--label <text>]
 zuwerk agent status idle
 ```
 
-Create and update a streaming message from an agent or script:
+A value of `-` for a message body or todo description reads that value from standard input:
 
 ```bash
-message_id=$(zuwerk messages stream create)
-zuwerk messages stream append "$message_id" "Deployment "
-zuwerk messages stream append "$message_id" "finished"
-zuwerk messages stream finish "$message_id"
+printf '%s' 'Deployment finished' | zuwerk messages create --project 17 --body -
+zuwerk todos create --project 17 --title 'Investigate logs' --description 'Check worker 2'
+printf '%s' 'Updated details' | zuwerk todos update 9 --project 17 --description -
 ```
 
-`messages stream create` prints only the numeric message ID in human mode, making it safe to capture in a shell. All status and stream lifecycle commands also accept `--json`; JSON mode writes the server response unchanged.
+Project and resource IDs must be positive decimal integers. Project-scoped commands always require `--project`; there is no implicit default project. Unknown flags, duplicate flags, legacy commands, and `--json` are rejected.
 
-### HTTP API contract
+## HTTP API contract
 
-Authenticated commands send `Authorization: Bearer <token>` and JSON request bodies:
+Authenticated requests send an `Authorization: Bearer …` header. Commands with request bodies send JSON with `Content-Type: application/json`.
 
 | CLI command | Method and path | Request body |
 | --- | --- | --- |
+| `projects list` | `GET /api/projects` | none |
+| `projects show ID` | `GET /api/projects/ID` | none |
+| `messages list --project ID` | `GET /api/projects/ID/messages` | none |
+| `messages create --project ID --body TEXT` | `POST /api/projects/ID/messages` | `{"body":"..."}` |
+| `todos list --project ID` | `GET /api/projects/ID/todos` | none |
+| `todos show ID --project PROJECT` | `GET /api/projects/PROJECT/todos/ID` | none |
+| `todos create --project ID --title TITLE [--description TEXT]` | `POST /api/projects/ID/todos` | `{"title":"..."}` with optional `"description"` |
+| `todos update ID --project PROJECT ...` | `PATCH /api/projects/PROJECT/todos/ID` | supplied `title`, `description`, and/or `status` fields |
 | `agent status working [--label TEXT]` | `POST /api/agent/status` | `{"status":"working"}` with optional `"label"` |
 | `agent status idle` | `POST /api/agent/status` | `{"status":"idle"}` |
-| `messages stream create` | `POST /api/messages/streams` | `{}` |
-| `messages stream append ID CHUNK` | `PATCH /api/messages/ID/stream` | `{"action":"append","chunk":"..."}` |
-| `messages stream finish ID` | `PATCH /api/messages/ID/stream` | `{"action":"finish"}` |
 
-Stream responses must be JSON objects containing a positive numeric `id`. Status responses must be valid JSON. Non-2xx HTTP responses and malformed responses cause a nonzero exit status without printing the API token.
-
-Show the CLI version:
-
-```bash
-zuwerk version
-```
+The CLI accepts bounded input and response bodies and requires successful API responses to contain valid JSON. Non-2xx responses, malformed JSON, and oversized responses produce a nonzero exit status without printing API response bodies or API tokens.
 
 ## Security
 
-The configuration directory is restricted to the current user and `config.json` is written with mode `0600`. Treat that file as a secret: it contains the API token. The CLI does not print API tokens in normal output or error messages.
+The configuration directory is restricted to the current user and `config.json` is written with mode `0600`. Treat that file as a secret because it contains the API token.
 
 ## Development
 
-Requires Go 1.25 or newer.
+Requires Go 1.26 or newer.
 
 ```bash
 gofmt -w .
