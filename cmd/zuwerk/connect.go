@@ -303,6 +303,13 @@ func connectOnce(ctx context.Context, wsURL, token string, stdin io.Writer, line
 		}
 	}()
 	headers := http.Header{"Authorization": []string{"Bearer " + token}}
+	if parsed, parseErr := url.Parse(wsURL); parseErr == nil {
+		originScheme := "https"
+		if parsed.Scheme == "ws" {
+			originScheme = "http"
+		}
+		headers.Set("Origin", originScheme+"://"+parsed.Host)
+	}
 	conn, resp, err := websocket.Dial(connectionCtx, wsURL, &websocket.DialOptions{HTTPHeader: headers})
 	if err != nil {
 		if resp != nil && (resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden) {

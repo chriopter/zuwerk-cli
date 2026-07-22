@@ -188,6 +188,9 @@ func TestConnectBridgesInOrderWithBearerSubscriptionAndHeartbeat(t *testing.T) {
 		if got := r.Header.Get("Authorization"); got != "Bearer secret-token" {
 			t.Errorf("authorization=%q", got)
 		}
+		if got, want := r.Header.Get("Origin"), "http://"+r.Host; got != want {
+			t.Errorf("origin=%q want %q", got, want)
+		}
 		conn, err := websocket.Accept(w, r, nil)
 		if err != nil {
 			return
