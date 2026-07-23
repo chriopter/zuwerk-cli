@@ -110,6 +110,8 @@ func runWithOptions(args []string, stdout, stderr io.Writer, opts options) int {
 		data, err = simpleResource(args[2:], opts, http.MethodGet, "/api/projects", "projects list")
 	case len(args) >= 2 && args[0] == "projects" && args[1] == "show":
 		data, err = showResource(args[2:], opts, "/api/projects/", "projects show")
+	case len(args) >= 1 && args[0] == "search":
+		data, err = searchProject(args[1:], opts)
 	case len(args) >= 2 && args[0] == "messages" && args[1] == "list":
 		data, err = projectList(args[2:], opts, "messages")
 	case len(args) >= 2 && args[0] == "messages" && args[1] == "create":
@@ -129,7 +131,7 @@ func runWithOptions(args []string, stdout, stderr io.Writer, opts options) int {
 	case len(args) >= 3 && args[0] == "agent" && args[1] == "status":
 		data, err = setAgentStatus(args[2:], opts)
 	default:
-		fmt.Fprintln(stderr, "usage: zuwerk <agent status|auth accept|connect|messages|projects|todos|version>")
+		fmt.Fprintln(stderr, "usage: zuwerk <agent status|auth accept|connect|messages|projects|search|todos|version>")
 		return 2
 	}
 	if err != nil {
@@ -158,6 +160,25 @@ func projectList(args []string, opts options, resource string) ([]byte, error) {
 		return nil, usageError(resource + " list --project <id>")
 	}
 	return authenticatedRequest(opts, http.MethodGet, "/api/projects/"+f["--project"]+"/"+resource, nil)
+}
+
+func searchProject(args []string, opts options) ([]byte, error) {
+	f, err := parseFlags(args, map[string]bool{"--project": true, "--query": true, "--limit": true})
+	query := strings.TrimSpace(f["--query"])
+	if err != nil || !positiveID(f["--project"]) || len([]rune(query)) < 2 || len([]rune(query)) > 500 {
+		return nil, usageError("search --project <id> --query <text> [--limit 1-20]")
+	}
+	limit := "10"
+	if value, ok := f["--limit"]; ok {
+		parsed, parseErr := strconv.Atoi(value)
+		if parseErr != nil || parsed < 1 || parsed > 20 || strconv.Itoa(parsed) != value {
+			return nil, usageError("search --project <id> --query <text> [--limit 1-20]")
+		}
+		limit = strconv.Itoa(parsed)
+	}
+	params := url.Values{"q": {query}, "limit": {limit}}
+	path := "/api/projects/" + f["--project"] + "/search?" + params.Encode()
+	return authenticatedRequest(opts, http.MethodGet, path, nil)
 }
 
 func createMessage(args []string, opts options) ([]byte, error) {

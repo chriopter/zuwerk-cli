@@ -27,6 +27,8 @@ zuwerk auth accept <invitation-url> --name <name>
 zuwerk projects list
 zuwerk projects show <id>
 
+zuwerk search --project <id> --query <text> [--limit <1-20>]
+
 zuwerk messages list --project <id>
 zuwerk messages create --project <id> --body <text|-> [--event <event-id>]
 
@@ -67,6 +69,7 @@ Authenticated requests send an `Authorization: Bearer …` header. Commands with
 | --- | --- | --- |
 | `projects list` | `GET /api/projects` | none |
 | `projects show ID` | `GET /api/projects/ID` | none |
+| `search --project ID --query TEXT [--limit N]` | `GET /api/projects/ID/search?q=TEXT&limit=N` | none |
 | `messages list --project ID` | `GET /api/projects/ID/messages` | none |
 | `messages create --project ID --body TEXT` | `POST /api/projects/ID/messages` | `{"body":"..."}` |
 | `todos list --project ID` | `GET /api/projects/ID/todos` | none |

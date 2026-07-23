@@ -60,6 +60,26 @@ func TestAuthAcceptRejectsAConfigurationServerOnAnotherOrigin(t *testing.T) {
 	}
 }
 
+func TestSearchCommandEncodesAProjectScopedSemanticQuery(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet || r.URL.Path != "/api/projects/7/search" {
+			t.Errorf("request=%s %s", r.Method, r.URL.Path)
+		}
+		if r.URL.Query().Get("q") != "Verbindung & Fehler" || r.URL.Query().Get("limit") != "5" {
+			t.Errorf("query=%q", r.URL.RawQuery)
+		}
+		if r.Header.Get("Authorization") != "Bearer secret-token" {
+			t.Errorf("authorization=%q", r.Header.Get("Authorization"))
+		}
+		fmt.Fprint(w, `{"query":"Verbindung & Fehler","project_id":7,"results":[]}`)
+	}))
+	defer server.Close()
+
+	out, errOut, code := execute(t, []string{"search", "--project", "7", "--query", "Verbindung & Fehler", "--limit", "5"}, writeTestConfig(t, server.URL, "secret-token"), nil, server.Client())
+	assertSuccess(t, out, errOut, code)
+	assertJSONEqual(t, out, `{"query":"Verbindung & Fehler","project_id":7,"results":[]}`)
+}
+
 func TestCanonicalResourceCommands(t *testing.T) {
 	tests := []struct {
 		name                         string
@@ -143,6 +163,10 @@ func TestStrictArgumentsRejectLegacyUnknownDuplicateAndInvalidIDs(t *testing.T) 
 		{"messages", "list", "--project", "0"}, {"projects", "show", "-1"}, {"todos", "show", "abc", "--project", "1"}, {"todos", "show", "1"},
 		{"messages", "list", "--project", "1", "--project", "2"},
 		{"messages", "list", "--project", "1", "--json"},
+		{"search"}, {"search", "--project", "1", "--query", "x"},
+		{"search", "--project", "1", "--query", "valid", "--limit", "21"},
+		{"search", "--project", "1", "--query", "valid", "--limit", "+5"},
+		{"search", "--project", "1", "--query", "valid", "--limit", "05"},
 		{"todos", "create", "--project", "1", "--title", "a", "--title", "b"},
 		{"todos", "update", "1"}, {"todos", "update", "1", "--project", "1", "--status", "closed"},
 		{"agent", "status", "idle", "--label", "x"}, {"agent", "status", "working", "--label", "a", "--label", "b"},
