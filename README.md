@@ -70,6 +70,8 @@ Use `zuwerk connect -- <adapter> [args...]` for any other ACP adapter or to supp
 
 The connector uses Action Cable at `/cable`, authenticates with the configured Bearer token, and subscribes to `AgentConnectorChannel`. It forwards one bounded JSON object per NDJSON line in both directions, emits heartbeats, reconnects transient socket failures with bounded exponential backoff, and shuts down with the adapter on SIGINT or SIGTERM. The API token is never placed in the WebSocket URL or diagnostic output.
 
+ACP sessions use the directory in which `zuwerk connect` was started. The connector replaces the server-side `cwd` placeholder in `session/new` and `session/load` before forwarding those requests to the local adapter.
+
 Unlike one-shot commands, `connect` is a long-running transport and does not write a JSON result to standard output. The adapter owns standard error; its standard output must contain ACP NDJSON only.
 
 ## HTTP API contract

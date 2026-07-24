@@ -242,6 +242,32 @@ func TestParseConnectArgs(t *testing.T) {
 	}
 }
 
+func TestWorkingDirectoryReplacesServerPlaceholderForSessionRequests(t *testing.T) {
+	for _, method := range []string{"session/new", "session/load"} {
+		input := fmt.Sprintf(`{"jsonrpc":"2.0","id":7,"method":%q,"params":{"cwd":"/workspace","mcpServers":[]}}`, method) + "\n"
+		got, err := withWorkingDirectory(input, "/home/agent/project")
+		if err != nil {
+			t.Fatal(err)
+		}
+		var message map[string]any
+		if err := json.Unmarshal([]byte(got), &message); err != nil {
+			t.Fatal(err)
+		}
+		params := message["params"].(map[string]any)
+		if params["cwd"] != "/home/agent/project" {
+			t.Fatalf("%s cwd=%v", method, params["cwd"])
+		}
+		if _, ok := params["mcpServers"]; !ok {
+			t.Fatalf("%s lost other params", method)
+		}
+	}
+
+	notification := `{"jsonrpc":"2.0","method":"session/cancel","params":{"sessionId":"one"}}` + "\n"
+	if got, err := withWorkingDirectory(notification, "/home/agent/project"); err != nil || got != notification {
+		t.Fatalf("unrelated message changed: %q, %v", got, err)
+	}
+}
+
 func TestCableURL(t *testing.T) {
 	for raw, want := range map[string]string{
 		"http://example.test":        "ws://example.test/cable",

@@ -52,6 +52,7 @@ type connectorOptions struct {
 	heartbeatInterval time.Duration
 	backoff           func(int) time.Duration
 	shutdownTimeout   time.Duration
+	workingDirectory  string
 }
 
 type execChild struct {
@@ -230,6 +231,13 @@ func runConnector(ctx context.Context, cfg config, argv []string, opts connector
 	if err != nil {
 		return err
 	}
+	workingDirectory := opts.workingDirectory
+	if workingDirectory == "" {
+		workingDirectory, err = os.Getwd()
+		if err != nil {
+			return fmt.Errorf("determine working directory: %w", err)
+		}
+	}
 	child, err := opts.startChild(ctx, argv)
 	if err != nil {
 		return fmt.Errorf("start adapter: %w", err)
@@ -283,7 +291,7 @@ func runConnector(ctx context.Context, cfg config, argv []string, opts connector
 
 	traffic := false
 	for attempt := 0; ; attempt++ {
-		outcome := connectOnce(ctx, wsURL, cfg.APIToken, child.Stdin(), lines, stdoutErr, childDone, opts.heartbeatInterval)
+		outcome := connectOnce(ctx, wsURL, cfg.APIToken, child.Stdin(), lines, stdoutErr, childDone, opts.heartbeatInterval, workingDirectory)
 		traffic = traffic || outcome.traffic
 		if errors.Is(outcome.err, errChildExited) {
 			return redactToken(childExitError(childWaitErr), cfg.APIToken)
@@ -320,7 +328,7 @@ func childExitError(err error) error {
 	return fmt.Errorf("%w: %v", errChildExited, err)
 }
 
-func connectOnce(ctx context.Context, wsURL, token string, stdin io.Writer, lines <-chan string, stdoutErr <-chan error, childDone <-chan struct{}, heartbeat time.Duration) (out connectionResult) {
+func connectOnce(ctx context.Context, wsURL, token string, stdin io.Writer, lines <-chan string, stdoutErr <-chan error, childDone <-chan struct{}, heartbeat time.Duration, workingDirectory string) (out connectionResult) {
 	connectionCtx, cancelConnection := context.WithCancel(ctx)
 	defer cancelConnection()
 	go func() {
@@ -437,6 +445,11 @@ func connectOnce(ctx context.Context, wsURL, token string, stdin io.Writer, line
 			return out
 		case line := <-incoming:
 			out.traffic = true
+			line, err = withWorkingDirectory(line, workingDirectory)
+			if err != nil {
+				out.err = fmt.Errorf("%w: rewrite ACP working directory: %v", errPermanent, err)
+				return out
+			}
 			if err := writeAdapterLine(ctx, stdin, line); err != nil {
 				out.err = fmt.Errorf("%w: write adapter stdin: %v", errPermanent, err)
 				return out
@@ -454,6 +467,38 @@ func connectOnce(ctx context.Context, wsURL, token string, stdin io.Writer, line
 			}
 		}
 	}
+}
+
+func withWorkingDirectory(line, workingDirectory string) (string, error) {
+	var message map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(line), &message); err != nil {
+		return "", err
+	}
+	var method string
+	if err := json.Unmarshal(message["method"], &method); err != nil || (method != "session/new" && method != "session/load") {
+		return line, nil
+	}
+	var params map[string]json.RawMessage
+	if err := json.Unmarshal(message["params"], &params); err != nil || params == nil {
+		return "", errors.New("session request params must be an object")
+	}
+	cwd, err := json.Marshal(workingDirectory)
+	if err != nil {
+		return "", err
+	}
+	params["cwd"] = cwd
+	message["params"], err = json.Marshal(params)
+	if err != nil {
+		return "", err
+	}
+	rewritten, err := json.Marshal(message)
+	if err != nil {
+		return "", err
+	}
+	if len(rewritten)+1 > maxACPLineBytes {
+		return "", errors.New("rewritten ACP line is too large")
+	}
+	return string(rewritten) + "\n", nil
 }
 
 func validInboundACPLine(line string) bool {
