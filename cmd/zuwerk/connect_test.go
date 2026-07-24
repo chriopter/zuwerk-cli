@@ -358,18 +358,23 @@ func TestConnectBridgesInOrderWithBearerSubscriptionAndHeartbeat(t *testing.T) {
 		snapshot := append([]cableCommand(nil), received...)
 		mu.Unlock()
 		var lines []string
+		var sequences []uint64
 		heartbeat := false
 		for _, c := range snapshot {
 			var d connectorPayload
 			json.Unmarshal([]byte(c.Data), &d)
 			if d.Type == "acp" {
 				lines = append(lines, d.Line)
+				sequences = append(sequences, d.Sequence)
 			}
 			if d.Type == "heartbeat" {
 				heartbeat = true
 			}
 		}
 		if len(lines) >= 2 && heartbeat {
+			if sequences[0] != 1 || sequences[1] != 2 {
+				t.Fatalf("sequences=%v", sequences)
+			}
 			if lines[0] != `{"jsonrpc":"2.0","id":2}`+"\n" || lines[1] != `{"jsonrpc":"2.0","id":3}`+"\n" {
 				t.Fatalf("lines=%v", lines)
 			}

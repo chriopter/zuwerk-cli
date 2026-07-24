@@ -31,8 +31,9 @@ type cableCommand struct {
 	Data       string `json:"data,omitempty"`
 }
 type connectorPayload struct {
-	Type string `json:"type"`
-	Line string `json:"line,omitempty"`
+	Type     string `json:"type"`
+	Line     string `json:"line,omitempty"`
+	Sequence uint64 `json:"sequence,omitempty"`
 }
 type cableEnvelope struct {
 	Type       string          `json:"type,omitempty"`
@@ -430,6 +431,7 @@ func connectOnce(ctx context.Context, wsURL, token string, stdin io.Writer, line
 
 	ticker := time.NewTicker(heartbeat)
 	defer ticker.Stop()
+	var nextSequence uint64
 	for {
 		select {
 		case <-ctx.Done():
@@ -456,7 +458,8 @@ func connectOnce(ctx context.Context, wsURL, token string, stdin io.Writer, line
 			}
 		case line := <-lines:
 			out.traffic = true
-			if err := perform(ctx, conn, connectorPayload{Type: "acp", Line: line}); err != nil {
+			nextSequence++
+			if err := perform(ctx, conn, connectorPayload{Type: "acp", Line: line, Sequence: nextSequence}); err != nil {
 				out.err = err
 				return out
 			}
