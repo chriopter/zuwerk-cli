@@ -42,6 +42,7 @@ zuwerk todos comments create --project <id> --todo <id> --body <text|-> [--event
 zuwerk agent status working [--label <text>]
 zuwerk agent status idle
 
+zuwerk connect <claude|codex|hermes>
 zuwerk connect -- <adapter> [args...]
 ```
 
@@ -57,7 +58,17 @@ Project and resource IDs must be positive decimal integers. Project-scoped comma
 
 ## ACP connector
 
-`zuwerk connect -- <adapter> [args...]` starts one local ACP adapter and keeps it connected to the configured Zuwerk server. The connector uses Action Cable at `/cable`, authenticates with the configured Bearer token, and subscribes to `AgentConnectorChannel`. It forwards one bounded JSON object per NDJSON line in both directions, emits heartbeats, reconnects transient socket failures with bounded exponential backoff, and shuts down with the adapter on SIGINT or SIGTERM. The API token is never placed in the WebSocket URL or diagnostic output.
+`zuwerk connect <profile>` starts one local ACP adapter and keeps it connected to the configured Zuwerk server. The built-in profiles resolve to these adapter commands:
+
+| Profile | Adapter command |
+| --- | --- |
+| `claude` | `claude-agent-acp` |
+| `codex` | `codex-acp` |
+| `hermes` | `hermes acp` |
+
+Use `zuwerk connect -- <adapter> [args...]` for any other ACP adapter or to supply custom arguments.
+
+The connector uses Action Cable at `/cable`, authenticates with the configured Bearer token, and subscribes to `AgentConnectorChannel`. It forwards one bounded JSON object per NDJSON line in both directions, emits heartbeats, reconnects transient socket failures with bounded exponential backoff, and shuts down with the adapter on SIGINT or SIGTERM. The API token is never placed in the WebSocket URL or diagnostic output.
 
 Unlike one-shot commands, `connect` is a long-running transport and does not write a JSON result to standard output. The adapter owns standard error; its standard output must contain ACP NDJSON only.
 

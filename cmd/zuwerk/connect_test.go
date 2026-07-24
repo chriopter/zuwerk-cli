@@ -227,9 +227,13 @@ func TestParseConnectArgs(t *testing.T) {
 		want []string
 		ok   bool
 	}{
+		{[]string{"claude"}, []string{"claude-agent-acp"}, true},
+		{[]string{"codex"}, []string{"codex-acp"}, true},
+		{[]string{"hermes"}, []string{"hermes", "acp"}, true},
 		{[]string{"--", "adapter"}, []string{"adapter"}, true},
 		{[]string{"--", "adapter", "--flag", "value"}, []string{"adapter", "--flag", "value"}, true},
-		{nil, nil, false}, {[]string{"adapter"}, nil, false}, {[]string{"--"}, nil, false}, {[]string{"--", ""}, nil, false},
+		{nil, nil, false}, {[]string{"adapter"}, nil, false}, {[]string{"CLAUDE"}, nil, false},
+		{[]string{"claude", "--flag"}, nil, false}, {[]string{"--"}, nil, false}, {[]string{"--", ""}, nil, false},
 	} {
 		got, err := parseConnectArgs(tt.args)
 		if (err == nil) != tt.ok || fmt.Sprint(got) != fmt.Sprint(tt.want) {

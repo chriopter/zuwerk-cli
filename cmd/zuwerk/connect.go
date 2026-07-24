@@ -96,11 +96,22 @@ func startExecChild(ctx context.Context, argv []string) (connectorChild, error) 
 	return &execChild{cmd: cmd, stdin: stdin, stdout: stdout}, nil
 }
 
+var agentAdapters = map[string][]string{
+	"claude": {"claude-agent-acp"},
+	"codex":  {"codex-acp"},
+	"hermes": {"hermes", "acp"},
+}
+
 func parseConnectArgs(args []string) ([]string, error) {
-	if len(args) < 2 || args[0] != "--" || strings.TrimSpace(args[1]) == "" {
-		return nil, usageError("connect -- <adapter> [args...]")
+	if len(args) == 1 {
+		if adapter, ok := agentAdapters[args[0]]; ok {
+			return append([]string(nil), adapter...), nil
+		}
 	}
-	return append([]string(nil), args[1:]...), nil
+	if len(args) >= 2 && args[0] == "--" && strings.TrimSpace(args[1]) != "" {
+		return append([]string(nil), args[1:]...), nil
+	}
+	return nil, usageError("connect <claude|codex|hermes> | connect -- <adapter> [args...]")
 }
 
 func cableURL(raw string) (string, error) {
