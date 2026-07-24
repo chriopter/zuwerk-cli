@@ -88,16 +88,16 @@ func TestCanonicalResourceCommands(t *testing.T) {
 	}{
 		{"projects list", []string{"projects", "list"}, "GET", "/api/projects", "", `[{"id":7,"name":"One"}]`},
 		{"projects show", []string{"projects", "show", "7"}, "GET", "/api/projects/7", "", `{"id":7,"name":"One"}`},
-		{"messages list", []string{"messages", "list", "--project", "7"}, "GET", "/api/projects/7/messages", "", `[{"id":2,"body":"Hi"}]`},
-		{"messages create", []string{"messages", "create", "--project", "7", "--body", "Ship it"}, "POST", "/api/projects/7/messages", `{"body":"Ship it"}`, `{"id":3,"body":"Ship it"}`},
-		{"messages create for event", []string{"messages", "create", "--project", "7", "--body", "Ship it", "--event", "event-123"}, "POST", "/api/projects/7/messages", `{"body":"Ship it","event_id":"event-123"}`, `{"id":3,"body":"Ship it"}`},
+		{"chat list", []string{"chat", "list", "--project", "7"}, "GET", "/api/projects/7/chat/messages", "", `[{"id":2,"body":"Hi"}]`},
+		{"chat send", []string{"chat", "send", "--project", "7", "--body", "Ship it"}, "POST", "/api/projects/7/chat/messages", `{"body":"Ship it"}`, `{"id":3,"body":"Ship it"}`},
+		{"chat send for event", []string{"chat", "send", "--project", "7", "--body", "Ship it", "--event", "event-123"}, "POST", "/api/projects/7/chat/messages", `{"body":"Ship it","event_id":"event-123"}`, `{"id":3,"body":"Ship it"}`},
 		{"events acknowledge", []string{"events", "acknowledge", "event-123"}, "POST", "/api/agent_events/event-123/acknowledge", "", `{"id":"event-123","state":"running"}`},
-		{"todos list", []string{"todos", "list", "--project", "7"}, "GET", "/api/projects/7/todos", "", `[{"id":4,"title":"Test"}]`},
-		{"todos show", []string{"todos", "show", "4", "--project", "7"}, "GET", "/api/projects/7/todos/4", "", `{"id":4,"title":"Test"}`},
-		{"todos create", []string{"todos", "create", "--project", "7", "--title", "Test", "--description", "Details"}, "POST", "/api/projects/7/todos", `{"description":"Details","title":"Test"}`, `{"id":4,"title":"Test"}`},
-		{"todos update", []string{"todos", "update", "4", "--project", "7", "--title", "Done", "--description", "All done", "--status", "completed"}, "PATCH", "/api/projects/7/todos/4", `{"description":"All done","status":"completed","title":"Done"}`, `{"id":4,"status":"completed"}`},
-		{"todo comments list", []string{"todos", "comments", "list", "--project", "7", "--todo", "4"}, "GET", "/api/projects/7/todos/4/comments", "", `[{"id":8,"body":"Context"}]`},
-		{"todo comments create", []string{"todos", "comments", "create", "--project", "7", "--todo", "4", "--event", "event-123", "--body", "Finished"}, "POST", "/api/projects/7/todos/4/comments", `{"body":"Finished","event_id":"event-123"}`, `{"id":8,"body":"Finished"}`},
+		{"tasks list", []string{"tasks", "list", "--project", "7"}, "GET", "/api/projects/7/tasks", "", `[{"id":4,"title":"Test"}]`},
+		{"tasks show", []string{"tasks", "show", "4", "--project", "7"}, "GET", "/api/projects/7/tasks/4", "", `{"id":4,"title":"Test"}`},
+		{"tasks create", []string{"tasks", "create", "--project", "7", "--title", "Test", "--description", "Details"}, "POST", "/api/projects/7/tasks", `{"description":"Details","title":"Test"}`, `{"id":4,"title":"Test"}`},
+		{"tasks update", []string{"tasks", "update", "4", "--project", "7", "--title", "Done", "--description", "All done", "--status", "completed"}, "PATCH", "/api/projects/7/tasks/4", `{"description":"All done","status":"completed","title":"Done"}`, `{"id":4,"status":"completed"}`},
+		{"task comments list", []string{"tasks", "comments", "list", "--project", "7", "--task", "4"}, "GET", "/api/projects/7/tasks/4/comments", "", `[{"id":8,"body":"Context"}]`},
+		{"task comments create", []string{"tasks", "comments", "create", "--project", "7", "--task", "4", "--event", "event-123", "--body", "Finished"}, "POST", "/api/projects/7/tasks/4/comments", `{"body":"Finished","event_id":"event-123"}`, `{"id":8,"body":"Finished"}`},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -115,18 +115,18 @@ func TestDashReadsBoundedStdin(t *testing.T) {
 		args []string
 		body string
 	}{
-		{[]string{"messages", "create", "--project", "2", "--body", "-"}, `{"body":"from stdin"}`},
-		{[]string{"todos", "create", "--project", "2", "--title", "T", "--description", "-"}, `{"description":"from stdin","title":"T"}`},
-		{[]string{"todos", "update", "9", "--project", "2", "--description", "-"}, `{"description":"from stdin"}`},
+		{[]string{"chat", "send", "--project", "2", "--body", "-"}, `{"body":"from stdin"}`},
+		{[]string{"tasks", "create", "--project", "2", "--title", "T", "--description", "-"}, `{"description":"from stdin","title":"T"}`},
+		{[]string{"tasks", "update", "9", "--project", "2", "--description", "-"}, `{"description":"from stdin"}`},
 	}
 	for _, tt := range tests {
-		path := "/api/projects/2/messages"
+		path := "/api/projects/2/chat/messages"
 		method := "POST"
-		if tt.args[0] == "todos" && tt.args[1] == "create" {
-			path = "/api/projects/2/todos"
+		if tt.args[0] == "tasks" && tt.args[1] == "create" {
+			path = "/api/projects/2/tasks"
 		}
 		if tt.args[1] == "update" {
-			path = "/api/projects/2/todos/9"
+			path = "/api/projects/2/tasks/9"
 			method = "PATCH"
 		}
 		server := apiServer(t, method, path, tt.body, `{"ok":true}`)
@@ -135,7 +135,7 @@ func TestDashReadsBoundedStdin(t *testing.T) {
 		assertSuccess(t, out, errOut, code)
 	}
 	tooLarge := strings.NewReader(strings.Repeat("x", maxInputBytes+1))
-	_, errOut, code := execute(t, []string{"messages", "create", "--project", "2", "--body", "-"}, t.TempDir(), tooLarge, http.DefaultClient)
+	_, errOut, code := execute(t, []string{"chat", "send", "--project", "2", "--body", "-"}, t.TempDir(), tooLarge, http.DefaultClient)
 	if code == 0 || !strings.Contains(errOut, "too large") {
 		t.Fatalf("code=%d stderr=%q", code, errOut)
 	}
@@ -160,17 +160,17 @@ func TestAgentStatusIsJSONOnly(t *testing.T) {
 func TestStrictArgumentsRejectLegacyUnknownDuplicateAndInvalidIDs(t *testing.T) {
 	cases := [][]string{
 		{"auth", "accept", "--name", "Robot", "https://example.test/i"},
-		{"messages", "post", "old"}, {"messages", "stream", "create"}, {"messages", "list"},
-		{"messages", "list", "--project", "0"}, {"projects", "show", "-1"}, {"todos", "show", "abc", "--project", "1"}, {"todos", "show", "1"},
-		{"messages", "list", "--project", "1", "--project", "2"},
-		{"messages", "list", "--project", "1", "--json"},
+		{"messages", "post", "old"}, {"messages", "stream", "create"}, {"chat", "list"},
+		{"chat", "list", "--project", "0"}, {"projects", "show", "-1"}, {"tasks", "show", "abc", "--project", "1"}, {"tasks", "show", "1"},
+		{"chat", "list", "--project", "1", "--project", "2"},
+		{"chat", "list", "--project", "1", "--json"},
 		{"events", "acknowledge"}, {"events", "acknowledge", "one", "two"},
 		{"search"}, {"search", "--project", "1", "--query", "x"},
 		{"search", "--project", "1", "--query", "valid", "--limit", "21"},
 		{"search", "--project", "1", "--query", "valid", "--limit", "+5"},
 		{"search", "--project", "1", "--query", "valid", "--limit", "05"},
-		{"todos", "create", "--project", "1", "--title", "a", "--title", "b"},
-		{"todos", "update", "1"}, {"todos", "update", "1", "--project", "1", "--status", "closed"},
+		{"tasks", "create", "--project", "1", "--title", "a", "--title", "b"},
+		{"tasks", "update", "1"}, {"tasks", "update", "1", "--project", "1", "--status", "closed"},
 		{"agent", "status", "idle", "--label", "x"}, {"agent", "status", "working", "--label", "a", "--label", "b"},
 	}
 	for _, args := range cases {

@@ -29,17 +29,17 @@ zuwerk projects show <id>
 
 zuwerk search --project <id> --query <text> [--limit <1-20>]
 
-zuwerk messages list --project <id>
-zuwerk messages create --project <id> --body <text|-> [--event <event-id>]
+zuwerk chat list --project <id>
+zuwerk chat send --project <id> --body <text|-> [--event <event-id>]
 
 zuwerk events acknowledge <event-id>
 
-zuwerk todos list --project <id>
-zuwerk todos show <id> --project <id>
-zuwerk todos create --project <id> --title <title> [--description <text|->]
-zuwerk todos update <id> --project <id> [--title <title>] [--description <text|->] [--status open|completed]
-zuwerk todos comments list --project <id> --todo <id>
-zuwerk todos comments create --project <id> --todo <id> --body <text|-> [--event <event-id>]
+zuwerk tasks list --project <id>
+zuwerk tasks show <id> --project <id>
+zuwerk tasks create --project <id> --title <title> [--description <text|->]
+zuwerk tasks update <id> --project <id> [--title <title>] [--description <text|->] [--status open|completed]
+zuwerk tasks comments list --project <id> --task <id>
+zuwerk tasks comments create --project <id> --task <id> --body <text|-> [--event <event-id>]
 
 zuwerk agent status working [--label <text>]
 zuwerk agent status idle
@@ -48,12 +48,12 @@ zuwerk connect <claude|codex|hermes>
 zuwerk connect -- <adapter> [args...]
 ```
 
-A value of `-` for a message body or todo description reads that value from standard input:
+A value of `-` for a message body or task description reads that value from standard input:
 
 ```bash
-printf '%s' 'Deployment finished' | zuwerk messages create --project 17 --body -
-zuwerk todos create --project 17 --title 'Investigate logs' --description 'Check worker 2'
-printf '%s' 'Updated details' | zuwerk todos update 9 --project 17 --description -
+printf '%s' 'Deployment finished' | zuwerk chat send --project 17 --body -
+zuwerk tasks create --project 17 --title 'Investigate logs' --description 'Check worker 2'
+printf '%s' 'Updated details' | zuwerk tasks update 9 --project 17 --description -
 ```
 
 Project and resource IDs must be positive decimal integers. Project-scoped commands always require `--project`; there is no implicit default project. Unknown flags, duplicate flags, legacy commands, and `--json` are rejected.
@@ -85,15 +85,15 @@ Authenticated requests send an `Authorization: Bearer …` header. Commands with
 | `projects list` | `GET /api/projects` | none |
 | `projects show ID` | `GET /api/projects/ID` | none |
 | `search --project ID --query TEXT [--limit N]` | `GET /api/projects/ID/search?q=TEXT&limit=N` | none |
-| `messages list --project ID` | `GET /api/projects/ID/messages` | none |
-| `messages create --project ID --body TEXT` | `POST /api/projects/ID/messages` | `{"body":"..."}` |
+| `chat list --project ID` | `GET /api/projects/ID/chat/messages` | none |
+| `chat send --project ID --body TEXT` | `POST /api/projects/ID/chat/messages` | `{"body":"..."}` |
 | `events acknowledge EVENT` | `POST /api/agent_events/EVENT/acknowledge` | none |
-| `todos list --project ID` | `GET /api/projects/ID/todos` | none |
-| `todos show ID --project PROJECT` | `GET /api/projects/PROJECT/todos/ID` | none |
-| `todos create --project ID --title TITLE [--description TEXT]` | `POST /api/projects/ID/todos` | `{"title":"..."}` with optional `"description"` |
-| `todos update ID --project PROJECT ...` | `PATCH /api/projects/PROJECT/todos/ID` | supplied `title`, `description`, and/or `status` fields |
-| `todos comments list --project PROJECT --todo ID` | `GET /api/projects/PROJECT/todos/ID/comments` | none |
-| `todos comments create --project PROJECT --todo ID --body TEXT` | `POST /api/projects/PROJECT/todos/ID/comments` | `{"body":"..."}` with optional `"event_id"` |
+| `tasks list --project ID` | `GET /api/projects/ID/tasks` | none |
+| `tasks show ID --project PROJECT` | `GET /api/projects/PROJECT/tasks/ID` | none |
+| `tasks create --project ID --title TITLE [--description TEXT]` | `POST /api/projects/ID/tasks` | `{"title":"..."}` with optional `"description"` |
+| `tasks update ID --project PROJECT ...` | `PATCH /api/projects/PROJECT/tasks/ID` | supplied `title`, `description`, and/or `status` fields |
+| `tasks comments list --project PROJECT --task ID` | `GET /api/projects/PROJECT/tasks/ID/comments` | none |
+| `tasks comments create --project PROJECT --task ID --body TEXT` | `POST /api/projects/PROJECT/tasks/ID/comments` | `{"body":"..."}` with optional `"event_id"` |
 | `agent status working [--label TEXT]` | `POST /api/agent/status` | `{"status":"working"}` with optional `"label"` |
 | `agent status idle` | `POST /api/agent/status` | `{"status":"idle"}` |
 

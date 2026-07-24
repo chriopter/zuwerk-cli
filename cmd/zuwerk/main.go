@@ -112,28 +112,28 @@ func runWithOptions(args []string, stdout, stderr io.Writer, opts options) int {
 		data, err = showResource(args[2:], opts, "/api/projects/", "projects show")
 	case len(args) >= 1 && args[0] == "search":
 		data, err = searchProject(args[1:], opts)
-	case len(args) >= 2 && args[0] == "messages" && args[1] == "list":
-		data, err = projectList(args[2:], opts, "messages")
-	case len(args) >= 2 && args[0] == "messages" && args[1] == "create":
-		data, err = createMessage(args[2:], opts)
+	case len(args) >= 2 && args[0] == "chat" && args[1] == "list":
+		data, err = projectList(args[2:], opts, "chat/messages", "chat")
+	case len(args) >= 2 && args[0] == "chat" && args[1] == "send":
+		data, err = createChatMessage(args[2:], opts)
 	case len(args) >= 2 && args[0] == "events" && args[1] == "acknowledge":
 		data, err = acknowledgeEvent(args[2:], opts)
-	case len(args) >= 2 && args[0] == "todos" && args[1] == "list":
-		data, err = projectList(args[2:], opts, "todos")
-	case len(args) >= 2 && args[0] == "todos" && args[1] == "show":
-		data, err = showTodo(args[2:], opts)
-	case len(args) >= 2 && args[0] == "todos" && args[1] == "create":
-		data, err = createTodo(args[2:], opts)
-	case len(args) >= 2 && args[0] == "todos" && args[1] == "update":
-		data, err = updateTodo(args[2:], opts)
-	case len(args) >= 3 && args[0] == "todos" && args[1] == "comments" && args[2] == "list":
-		data, err = listTodoComments(args[3:], opts)
-	case len(args) >= 3 && args[0] == "todos" && args[1] == "comments" && args[2] == "create":
-		data, err = createTodoComment(args[3:], opts)
+	case len(args) >= 2 && args[0] == "tasks" && args[1] == "list":
+		data, err = projectList(args[2:], opts, "tasks", "tasks")
+	case len(args) >= 2 && args[0] == "tasks" && args[1] == "show":
+		data, err = showTask(args[2:], opts)
+	case len(args) >= 2 && args[0] == "tasks" && args[1] == "create":
+		data, err = createTask(args[2:], opts)
+	case len(args) >= 2 && args[0] == "tasks" && args[1] == "update":
+		data, err = updateTask(args[2:], opts)
+	case len(args) >= 3 && args[0] == "tasks" && args[1] == "comments" && args[2] == "list":
+		data, err = listTaskComments(args[3:], opts)
+	case len(args) >= 3 && args[0] == "tasks" && args[1] == "comments" && args[2] == "create":
+		data, err = createTaskComment(args[3:], opts)
 	case len(args) >= 3 && args[0] == "agent" && args[1] == "status":
 		data, err = setAgentStatus(args[2:], opts)
 	default:
-		fmt.Fprintln(stderr, "usage: zuwerk <agent status|auth accept|connect|events|messages|projects|search|todos|version>")
+		fmt.Fprintln(stderr, "usage: zuwerk <agent status|auth accept|connect|events|chat|projects|search|tasks|version>")
 		return 2
 	}
 	if err != nil {
@@ -163,10 +163,10 @@ func showResource(args []string, opts options, base, usage string) ([]byte, erro
 	}
 	return authenticatedRequest(opts, http.MethodGet, base+args[0], nil)
 }
-func projectList(args []string, opts options, resource string) ([]byte, error) {
+func projectList(args []string, opts options, resource, command string) ([]byte, error) {
 	f, err := parseFlags(args, map[string]bool{"--project": true})
 	if err != nil || !positiveID(f["--project"]) {
-		return nil, usageError(resource + " list --project <id>")
+		return nil, usageError(command + " list --project <id>")
 	}
 	return authenticatedRequest(opts, http.MethodGet, "/api/projects/"+f["--project"]+"/"+resource, nil)
 }
@@ -190,10 +190,10 @@ func searchProject(args []string, opts options) ([]byte, error) {
 	return authenticatedRequest(opts, http.MethodGet, path, nil)
 }
 
-func createMessage(args []string, opts options) ([]byte, error) {
+func createChatMessage(args []string, opts options) ([]byte, error) {
 	f, err := parseFlags(args, map[string]bool{"--project": true, "--body": true, "--event": true})
 	if err != nil || !positiveID(f["--project"]) || f["--body"] == "" {
-		return nil, usageError("messages create --project <id> --body <text|-> [--event <id>]")
+		return nil, usageError("chat send --project <id> --body <text|-> [--event <id>]")
 	}
 	body, err := textValue(f["--body"], opts.stdin)
 	if err != nil {
@@ -202,17 +202,17 @@ func createMessage(args []string, opts options) ([]byte, error) {
 	payloadFields := map[string]string{"body": body}
 	if eventID, ok := f["--event"]; ok {
 		if strings.TrimSpace(eventID) == "" || len(eventID) > 200 {
-			return nil, usageError("messages create --project <id> --body <text|-> [--event <id>]")
+			return nil, usageError("chat send --project <id> --body <text|-> [--event <id>]")
 		}
 		payloadFields["event_id"] = eventID
 	}
 	payload, _ := json.Marshal(payloadFields)
-	return authenticatedRequest(opts, http.MethodPost, "/api/projects/"+f["--project"]+"/messages", payload)
+	return authenticatedRequest(opts, http.MethodPost, "/api/projects/"+f["--project"]+"/chat/messages", payload)
 }
-func createTodo(args []string, opts options) ([]byte, error) {
+func createTask(args []string, opts options) ([]byte, error) {
 	f, err := parseFlags(args, map[string]bool{"--project": true, "--title": true, "--description": true})
 	if err != nil || !positiveID(f["--project"]) || strings.TrimSpace(f["--title"]) == "" {
-		return nil, usageError("todos create --project <id> --title <title> [--description <text|->]")
+		return nil, usageError("tasks create --project <id> --title <title> [--description <text|->]")
 	}
 	if len(f["--title"]) > maxInputBytes {
 		return nil, errors.New("input is too large")
@@ -226,32 +226,32 @@ func createTodo(args []string, opts options) ([]byte, error) {
 		p["description"] = v
 	}
 	payload, _ := json.Marshal(p)
-	return authenticatedRequest(opts, http.MethodPost, "/api/projects/"+f["--project"]+"/todos", payload)
+	return authenticatedRequest(opts, http.MethodPost, "/api/projects/"+f["--project"]+"/tasks", payload)
 }
-func showTodo(args []string, opts options) ([]byte, error) {
+func showTask(args []string, opts options) ([]byte, error) {
 	if len(args) < 1 || !positiveID(args[0]) {
-		return nil, usageError("todos show <id> --project <id>")
+		return nil, usageError("tasks show <id> --project <id>")
 	}
 	f, err := parseFlags(args[1:], map[string]bool{"--project": true})
 	if err != nil || !positiveID(f["--project"]) {
-		return nil, usageError("todos show <id> --project <id>")
+		return nil, usageError("tasks show <id> --project <id>")
 	}
-	return authenticatedRequest(opts, http.MethodGet, "/api/projects/"+f["--project"]+"/todos/"+args[0], nil)
+	return authenticatedRequest(opts, http.MethodGet, "/api/projects/"+f["--project"]+"/tasks/"+args[0], nil)
 }
-func updateTodo(args []string, opts options) ([]byte, error) {
+func updateTask(args []string, opts options) ([]byte, error) {
 	if len(args) < 1 || !positiveID(args[0]) {
-		return nil, usageError("todos update <id> --project <id> [--title ...] [--description ...] [--status open|completed]")
+		return nil, usageError("tasks update <id> --project <id> [--title ...] [--description ...] [--status open|completed]")
 	}
 	f, err := parseFlags(args[1:], map[string]bool{"--project": true, "--title": true, "--description": true, "--status": true})
 	projectID := f["--project"]
 	if err != nil || !positiveID(projectID) || len(f) == 1 {
-		return nil, usageError("todos update <id> --project <id> [--title ...] [--description ...] [--status open|completed]")
+		return nil, usageError("tasks update <id> --project <id> [--title ...] [--description ...] [--status open|completed]")
 	}
 	if s, ok := f["--status"]; ok && s != "open" && s != "completed" {
-		return nil, usageError("todos update <id> --project <id> [--title ...] [--description ...] [--status open|completed]")
+		return nil, usageError("tasks update <id> --project <id> [--title ...] [--description ...] [--status open|completed]")
 	}
 	if t, ok := f["--title"]; ok && (strings.TrimSpace(t) == "" || len(t) > maxInputBytes) {
-		return nil, usageError("todos update <id> --project <id> [--title ...] [--description ...] [--status open|completed]")
+		return nil, usageError("tasks update <id> --project <id> [--title ...] [--description ...] [--status open|completed]")
 	}
 	p := map[string]string{}
 	for k, v := range f {
@@ -268,19 +268,19 @@ func updateTodo(args []string, opts options) ([]byte, error) {
 		p[key] = v
 	}
 	payload, _ := json.Marshal(p)
-	return authenticatedRequest(opts, http.MethodPatch, "/api/projects/"+projectID+"/todos/"+args[0], payload)
+	return authenticatedRequest(opts, http.MethodPatch, "/api/projects/"+projectID+"/tasks/"+args[0], payload)
 }
-func listTodoComments(args []string, opts options) ([]byte, error) {
-	f, err := parseFlags(args, map[string]bool{"--project": true, "--todo": true})
-	if err != nil || !positiveID(f["--project"]) || !positiveID(f["--todo"]) {
-		return nil, usageError("todos comments list --project <id> --todo <id>")
+func listTaskComments(args []string, opts options) ([]byte, error) {
+	f, err := parseFlags(args, map[string]bool{"--project": true, "--task": true})
+	if err != nil || !positiveID(f["--project"]) || !positiveID(f["--task"]) {
+		return nil, usageError("tasks comments list --project <id> --task <id>")
 	}
-	return authenticatedRequest(opts, http.MethodGet, "/api/projects/"+f["--project"]+"/todos/"+f["--todo"]+"/comments", nil)
+	return authenticatedRequest(opts, http.MethodGet, "/api/projects/"+f["--project"]+"/tasks/"+f["--task"]+"/comments", nil)
 }
-func createTodoComment(args []string, opts options) ([]byte, error) {
-	f, err := parseFlags(args, map[string]bool{"--project": true, "--todo": true, "--body": true, "--event": true})
-	if err != nil || !positiveID(f["--project"]) || !positiveID(f["--todo"]) || f["--body"] == "" {
-		return nil, usageError("todos comments create --project <id> --todo <id> --body <text|-> [--event <id>]")
+func createTaskComment(args []string, opts options) ([]byte, error) {
+	f, err := parseFlags(args, map[string]bool{"--project": true, "--task": true, "--body": true, "--event": true})
+	if err != nil || !positiveID(f["--project"]) || !positiveID(f["--task"]) || f["--body"] == "" {
+		return nil, usageError("tasks comments create --project <id> --task <id> --body <text|-> [--event <id>]")
 	}
 	body, err := textValue(f["--body"], opts.stdin)
 	if err != nil {
@@ -289,12 +289,12 @@ func createTodoComment(args []string, opts options) ([]byte, error) {
 	p := map[string]string{"body": body}
 	if eventID, ok := f["--event"]; ok {
 		if strings.TrimSpace(eventID) == "" || len(eventID) > 200 {
-			return nil, usageError("todos comments create --project <id> --todo <id> --body <text|-> [--event <id>]")
+			return nil, usageError("tasks comments create --project <id> --task <id> --body <text|-> [--event <id>]")
 		}
 		p["event_id"] = eventID
 	}
 	payload, _ := json.Marshal(p)
-	return authenticatedRequest(opts, http.MethodPost, "/api/projects/"+f["--project"]+"/todos/"+f["--todo"]+"/comments", payload)
+	return authenticatedRequest(opts, http.MethodPost, "/api/projects/"+f["--project"]+"/tasks/"+f["--task"]+"/comments", payload)
 }
 func setAgentStatus(args []string, opts options) ([]byte, error) {
 	if len(args) < 1 {
