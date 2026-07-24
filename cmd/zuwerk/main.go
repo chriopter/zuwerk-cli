@@ -116,6 +116,8 @@ func runWithOptions(args []string, stdout, stderr io.Writer, opts options) int {
 		data, err = projectList(args[2:], opts, "messages")
 	case len(args) >= 2 && args[0] == "messages" && args[1] == "create":
 		data, err = createMessage(args[2:], opts)
+	case len(args) >= 2 && args[0] == "events" && args[1] == "acknowledge":
+		data, err = acknowledgeEvent(args[2:], opts)
 	case len(args) >= 2 && args[0] == "todos" && args[1] == "list":
 		data, err = projectList(args[2:], opts, "todos")
 	case len(args) >= 2 && args[0] == "todos" && args[1] == "show":
@@ -131,7 +133,7 @@ func runWithOptions(args []string, stdout, stderr io.Writer, opts options) int {
 	case len(args) >= 3 && args[0] == "agent" && args[1] == "status":
 		data, err = setAgentStatus(args[2:], opts)
 	default:
-		fmt.Fprintln(stderr, "usage: zuwerk <agent status|auth accept|connect|messages|projects|search|todos|version>")
+		fmt.Fprintln(stderr, "usage: zuwerk <agent status|auth accept|connect|events|messages|projects|search|todos|version>")
 		return 2
 	}
 	if err != nil {
@@ -140,6 +142,13 @@ func runWithOptions(args []string, stdout, stderr io.Writer, opts options) int {
 	}
 	writeJSON(stdout, data)
 	return 0
+}
+
+func acknowledgeEvent(args []string, opts options) ([]byte, error) {
+	if len(args) != 1 || strings.TrimSpace(args[0]) == "" || len(args[0]) > 200 {
+		return nil, usageError("events acknowledge <id>")
+	}
+	return authenticatedRequest(opts, http.MethodPost, "/api/agent_events/"+url.PathEscape(args[0])+"/acknowledge", nil)
 }
 
 func simpleResource(args []string, opts options, method, path, usage string) ([]byte, error) {

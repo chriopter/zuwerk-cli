@@ -32,6 +32,8 @@ zuwerk search --project <id> --query <text> [--limit <1-20>]
 zuwerk messages list --project <id>
 zuwerk messages create --project <id> --body <text|-> [--event <event-id>]
 
+zuwerk events acknowledge <event-id>
+
 zuwerk todos list --project <id>
 zuwerk todos show <id> --project <id>
 zuwerk todos create --project <id> --title <title> [--description <text|->]
@@ -85,6 +87,7 @@ Authenticated requests send an `Authorization: Bearer …` header. Commands with
 | `search --project ID --query TEXT [--limit N]` | `GET /api/projects/ID/search?q=TEXT&limit=N` | none |
 | `messages list --project ID` | `GET /api/projects/ID/messages` | none |
 | `messages create --project ID --body TEXT` | `POST /api/projects/ID/messages` | `{"body":"..."}` |
+| `events acknowledge EVENT` | `POST /api/agent_events/EVENT/acknowledge` | none |
 | `todos list --project ID` | `GET /api/projects/ID/todos` | none |
 | `todos show ID --project PROJECT` | `GET /api/projects/PROJECT/todos/ID` | none |
 | `todos create --project ID --title TITLE [--description TEXT]` | `POST /api/projects/ID/todos` | `{"title":"..."}` with optional `"description"` |
